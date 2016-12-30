@@ -15,7 +15,7 @@ var connection = mysql.createConnection({
 });
 var instances = [];
 
-let dbStore = new RelationalDbStore({
+let configMySQL = {
     dialect: "mysql",
     host: "kscript.ru",
     port: 3306,
@@ -23,18 +23,14 @@ let dbStore = new RelationalDbStore({
     username: "kamertonmu_ks",
     password: "arurU75v",
     logging: false
-});
-let dbStore2 = new RelationalDbStore({
-    dialect: "mysql",
-    host: "kscript.ru",
-    port: 3306,
-    database: "kamertonmu_kscript", // If not provided, defaults to the name of the resource
-    username: "kamertonmu_ks",
-    password: "arurU75v",
-    logging: false
-});
+};
+
+let dbStore = new RelationalDbStore(configMySQL);
+let dbStore2 = new RelationalDbStore(configMySQL);
+let dbStore3 = new RelationalDbStore(configMySQL);
 instances.push(dbStore);
 instances.push(dbStore2);
+instances.push(dbStore3);
 
 jsonApi.setConfig({
     port: 80,
@@ -48,15 +44,42 @@ jsonApi.define({
     attributes: {
         title: jsonApi.Joi.string(),
         content: jsonApi.Joi.string(),
-        author: jsonApi.Joi.one('users')
+        typenote: jsonApi.Joi.string(),
+        author: jsonApi.Joi.one('users'),
+        company: jsonApi.Joi.one('companies')
+    }
+});
+jsonApi.define({
+    resource: "companies",
+    handlers: dbStore2,
+    attributes: {
+        name: jsonApi.Joi.string(),
+        name: jsonApi.Joi.string(),
+        info: jsonApi.Joi.string(),
+        address: jsonApi.Joi.string(),
+        phone: jsonApi.Joi.string(),
+        worktime: jsonApi.Joi.string(),
+        website: jsonApi.Joi.string(),
+        vk: jsonApi.Joi.string(),
+        instagram: jsonApi.Joi.string(),
+        facebook: jsonApi.Joi.string(),
+        owner: jsonApi.Joi.one('users'),
+        notes: jsonApi.Joi.belongsToMany({
+            resource: "notes",
+            as: "company"
+        })
     }
 });
 jsonApi.define({
     resource: "users",
-    handlers: dbStore2,
+    handlers: dbStore3,
     attributes: {
         username: jsonApi.Joi.string(),
-        password: jsonApi.Joi.string(),
+        //password: jsonApi.Joi.string(),
+        companies: jsonApi.Joi.belongsToMany({
+            resource: "companies",
+            as: "owner"
+        }),
         notes: jsonApi.Joi.belongsToMany({
             resource: "notes",
             as: "author"
@@ -192,10 +215,10 @@ bearer({
         });
     },
     secureRoutes: [{
-            url: '/api/users/auth',
+            url: '/api/users/*',
             method: 'get',
             //roles: 'admin'
-      } //any action under /secure route but NOT default "/secure" route
+      }
     ]
 });
 
@@ -203,20 +226,13 @@ bearer({
 
 //==============================================================================
 //Routing
-app.get('/api/:table/auth', function (req, res) {
-    if (req.authToken['custom_id']) connection.query('SELECT * FROM ?? WHERE `id` LIKE "' + req.authToken['custom_id'] + '"', [req.params.table], function (err, rows) {
-        if (!err && rows[0]) {
-            let id = rows[0].id;
-            delete rows[0].password;
-            delete rows[0].id;
-            return res.json({
-                "data": {
-                    "id": id,
-                    "type": "users",
-                    "attributes": rows[0]
-                }
-            });
-        } else return res.status(400).send('{"error": "Вы указали неправильный логин или пароль"}');
+app.get('/api/:table/auth', function (req, res, next) {
+    let id = req.authToken['custom_id'];
+    if (id) res.json({
+        "data": {
+            "id": id,
+            "type": "users"
+        }
     });
 });
 
