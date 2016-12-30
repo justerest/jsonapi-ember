@@ -13,6 +13,25 @@ var connection = mysql.createConnection({
     password: 'arurU75v',
     database: 'kamertonmu_kscript'
 });
+var multer = require('multer');
+var fs = require('fs-extra');
+
+var storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        let dir = __dirname + '/uploads/' + req.params.user + '/' + req.params.company;
+        fs.mkdirs(dir, function (err) {
+            cb(null, dir);
+        });
+    },
+    filename: function (req, file, cb) {
+        cb(null, file.originalname);
+    }
+});
+
+var upload = multer({
+    storage: storage
+});
+
 var instances = [];
 
 let configMySQL = {
@@ -235,6 +254,8 @@ app.get('/api/:table/auth', function (req, res, next) {
         }
     });
 });
+
+app.post('/upload/:user/:company', upload.single('file'), function (req, res, next) {});
 
 async.map(instances, function (dbStore, callback) {
     dbStore.populate(callback);
