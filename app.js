@@ -254,20 +254,6 @@ app.get('/api/:table/auth', function (req, res, next) {
     req.href = '/api/users/' + id;
     req.url = '/api/users/' + id;
     next();
-    //    if (id) connection.query('SELECT * FROM `users` WHERE `id` LIKE "' + id + '"', function (err, rows) {
-    //        if (!err && rows) {
-    //            delete rows[0].password;
-    //            delete rows[0].id;
-    //            res.send({
-    //                data: {
-    //                    id: id,
-    //                    type: 'user',
-    //                    attributes: rows[0]
-    //                }
-    //            })
-    //        } else res.status(402).send('No ID');
-    //    });
-    //    else res.status(402).send('No ID');
 });
 
 app.post('/upload/:user', upload.single('file'), function (req, res) {
