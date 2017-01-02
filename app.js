@@ -9,8 +9,8 @@ var mysql = require('mysql');
 var async = require("async");
 var connection = mysql.createConnection({
     host: 'kscript.ru',
-    user: 'kamertonmu_ks',
-    password: 'arurU75v',
+    user: 'kamertonmu_just',
+    password: 'PKCXLWEQ',
     database: 'kamertonmu_kscript'
 });
 var multer = require('multer');
@@ -18,38 +18,40 @@ var fs = require('fs-extra');
 
 var storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        let dir = __dirname + '/uploads/' + req.params.user + '/' + req.params.company;
-        fs.mkdirs(dir, function (err) {
-            cb(null, dir);
-        });
-    },
-    filename: function (req, file, cb) {
-        cb(null, file.originalname);
-    }
+            let dir = __dirname + '/../gorodrazvlecheniy/public/upload/' + req.params.user + '/new';
+            fs.removeSync(dir);
+            fs.mkdirs(dir, function (err) {
+                cb(null, dir);
+            });
+        }
+        /*,
+        filename: function (req, file, cb) {
+            cb(null, file.originalname);
+        }*/
 });
 
 var upload = multer({
     storage: storage
 });
 
-var instances = [];
+//var instances = [];
 
 let configMySQL = {
     dialect: "mysql",
     host: "kscript.ru",
     port: 3306,
     database: "kamertonmu_kscript", // If not provided, defaults to the name of the resource
-    username: "kamertonmu_ks",
-    password: "arurU75v",
+    username: "kamertonmu_just",
+    password: "PKCXLWEQ",
     logging: false
 };
 
 let dbStore = new RelationalDbStore(configMySQL);
 let dbStore2 = new RelationalDbStore(configMySQL);
 let dbStore3 = new RelationalDbStore(configMySQL);
-instances.push(dbStore);
-instances.push(dbStore2);
-instances.push(dbStore3);
+//instances.push(dbStore);
+//instances.push(dbStore2);
+//instances.push(dbStore3);
 
 jsonApi.setConfig({
     port: 80,
@@ -73,7 +75,7 @@ jsonApi.define({
     handlers: dbStore2,
     attributes: {
         name: jsonApi.Joi.string(),
-        name: jsonApi.Joi.string(),
+        logo: jsonApi.Joi.string(),
         info: jsonApi.Joi.string(),
         address: jsonApi.Joi.string(),
         phone: jsonApi.Joi.string(),
@@ -94,7 +96,7 @@ jsonApi.define({
     handlers: dbStore3,
     attributes: {
         username: jsonApi.Joi.string(),
-        //password: jsonApi.Joi.string(),
+        password: jsonApi.Joi.string(),
         companies: jsonApi.Joi.belongsToMany({
             resource: "companies",
             as: "owner"
@@ -247,18 +249,42 @@ bearer({
 //Routing
 app.get('/api/:table/auth', function (req, res, next) {
     let id = req.authToken['custom_id'];
-    if (id) res.json({
-        "data": {
-            "id": id,
-            "type": "users"
-        }
-    });
+    if (!id) return res.status(402).send('No ID');
+    req.path = '/api/users/' + id;
+    req.href = '/api/users/' + id;
+    req.url = '/api/users/' + id;
+    next();
+    //    if (id) connection.query('SELECT * FROM `users` WHERE `id` LIKE "' + id + '"', function (err, rows) {
+    //        if (!err && rows) {
+    //            delete rows[0].password;
+    //            delete rows[0].id;
+    //            res.send({
+    //                data: {
+    //                    id: id,
+    //                    type: 'user',
+    //                    attributes: rows[0]
+    //                }
+    //            })
+    //        } else res.status(402).send('No ID');
+    //    });
+    //    else res.status(402).send('No ID');
 });
 
-app.post('/upload/:user/:company', upload.single('file'), function (req, res, next) {});
+app.post('/upload/:user', upload.single('file'), function (req, res) {
+    res.send(req.file.path);
+});
 
-async.map(instances, function (dbStore, callback) {
-    dbStore.populate(callback);
-}, function () {});
+app.post('/api/companies/', function (req, res, next) {
+    let user = req.authToken.username;
+    let dir = __dirname + '/../gorodrazvlecheniy/public/upload/' + user;
+    fs.move(dir + '/new', dir + '/files', function () {
+        fs.remove(dir + '/new');
+    });
+    next();
+});
+
+//async.map(instances, function (dbStore, callback) {
+//    dbStore.populate(callback);
+//}, function () {});
 
 jsonApi.start();
