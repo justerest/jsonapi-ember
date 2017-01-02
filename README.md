@@ -8,3 +8,4 @@
 * `cd jsonapi-ember`
 * `npm install`
 * `bower install`
+* `npm start`
