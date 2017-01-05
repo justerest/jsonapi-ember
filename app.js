@@ -1,6 +1,5 @@
 var jsonApi = require("jsonapi-server");
 var RelationalDbStore = require("jsonapi-store-relationaldb");
-var Joi = require("joi");
 var app = jsonApi.getExpressServer();
 var bodyParser = require('body-parser');
 var moment = require('moment');
@@ -15,13 +14,16 @@ var connection = mysql.createConnection({
 });
 var multer = require('multer');
 var fs = require('fs-extra');
+var imagemin = require('imagemin');
+var imageminPngquant = require('imagemin-pngquant');
 
 var storage = multer.diskStorage({
     destination: function (req, file, cb) {
-            let dir = __dirname + '/../gorodrazvlecheniy/public/upload/' + req.params.user + '/new';
-            fs.removeSync(dir);
-            fs.mkdirs(dir, function (err) {
-                cb(null, dir);
+            let dir = __dirname + '/../gorodrazvlecheniy/public/upload/' + req.params.user + '/new/' + req.params.name;
+            fs.emptyDir(dir, function () {
+                fs.mkdirs(dir, function (err) {
+                    cb(null, dir);
+                });
             });
         }
         /*,
@@ -34,7 +36,7 @@ var upload = multer({
     storage: storage
 });
 
-//var instances = [];
+var instances = [];
 
 let configMySQL = {
     dialect: "mysql",
@@ -49,9 +51,11 @@ let configMySQL = {
 let dbStore = new RelationalDbStore(configMySQL);
 let dbStore2 = new RelationalDbStore(configMySQL);
 let dbStore3 = new RelationalDbStore(configMySQL);
-//instances.push(dbStore);
-//instances.push(dbStore2);
-//instances.push(dbStore3);
+let dbStore4 = new RelationalDbStore(configMySQL);
+instances.push(dbStore);
+instances.push(dbStore2);
+instances.push(dbStore3);
+instances.push(dbStore4);
 
 jsonApi.setConfig({
     port: 80,
@@ -59,6 +63,15 @@ jsonApi.setConfig({
     base: 'api'
 });
 
+jsonApi.define({
+    resource: "images",
+    handlers: dbStore4,
+    attributes: {
+        path: jsonApi.Joi.string(),
+        typeimage: jsonApi.Joi.string(),
+        user: jsonApi.Joi.one('users')
+    }
+});
 jsonApi.define({
     resource: "notes",
     handlers: dbStore,
@@ -75,7 +88,6 @@ jsonApi.define({
     handlers: dbStore2,
     attributes: {
         name: jsonApi.Joi.string(),
-        logo: jsonApi.Joi.string(),
         info: jsonApi.Joi.string(),
         address: jsonApi.Joi.string(),
         phone: jsonApi.Joi.string(),
@@ -97,6 +109,11 @@ jsonApi.define({
     attributes: {
         username: jsonApi.Joi.string(),
         password: jsonApi.Joi.string(),
+        fullname: jsonApi.Joi.string(),
+        roles: jsonApi.Joi.string(),
+        phone: jsonApi.Joi.string(),
+        email: jsonApi.Joi.string().email(),
+        money: jsonApi.Joi.number(),
         companies: jsonApi.Joi.belongsToMany({
             resource: "companies",
             as: "owner"
@@ -104,6 +121,10 @@ jsonApi.define({
         notes: jsonApi.Joi.belongsToMany({
             resource: "notes",
             as: "author"
+        }),
+        images: jsonApi.Joi.belongsToMany({
+            resource: "images",
+            as: "user"
         })
     }
 });
@@ -217,7 +238,7 @@ bearer({
         //Provide role level access restrictions on url
         //You can use onTokenValid for this also, but I find this easier to read later
         //If you specified "roles" property for any secureRoute below, you must implement this method
-        connection.query('SELECT * FROM `users` WHERE `id` = ' + token.custom_id + ' AND `roles` LIKE "' + roles + '"', function (err, rows) {
+        connection.query('SELECT * FROM `users` WHERE `id` LIKE ' + token.custom_id + ' AND `roles` LIKE "' + roles + '"', function (err, rows) {
             let id = rows[0] ? rows[0].id : 'not';
             if (!err && id == token.custom_id) {
                 next();
@@ -256,21 +277,40 @@ app.get('/api/:table/auth', function (req, res, next) {
     next();
 });
 
-app.post('/upload/:user', upload.single('file'), function (req, res) {
-    res.send(req.file.path);
+app.post('/upload/:user/:name', upload.single('file'), function (req, res) {
+    res.send({
+        dest: req.file.destination,
+        name: req.file.filename
+    });
 });
 
-app.post('/api/companies/', function (req, res, next) {
+app.post('/api/images/', function (req, res, next) {
     let user = req.authToken.username;
     let dir = __dirname + '/../gorodrazvlecheniy/public/upload/' + user;
-    fs.move(dir + '/new', dir + '/files', function () {
-        fs.remove(dir + '/new');
+    imagemin([dir + '/new/**'], dir + '/files', {
+        plugins: [
+        imageminPngquant({
+                quality: '65-80'
+            })
+    ]
     });
+    fs.emptyDir(dir + '/new');
     next();
 });
 
-//async.map(instances, function (dbStore, callback) {
-//    dbStore.populate(callback);
-//}, function () {});
+app.delete('/api/images/:id', function (req, res, next) {
+    let dir = __dirname + '/../gorodrazvlecheniy/public';
+    connection.query('SELECT * FROM `images` WHERE `id` LIKE "' + req.params.id + '"', function (err, rows) {
+        if (!err && rows) {
+            dir += rows[0].path;
+            fs.remove(dir);
+            next();
+        }
+    });
+});
+
+async.map(instances, function (dbStore, callback) {
+    dbStore.populate(callback);
+}, function () {});
 
 jsonApi.start();
