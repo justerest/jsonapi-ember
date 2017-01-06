@@ -280,7 +280,7 @@ app.get('/api/:table/auth', function (req, res, next) {
 app.post('/upload/:user/:name', upload.single('file'), function (req, res) {
     res.send({
         dest: req.file.destination,
-        name: req.file.filename
+        imgName: req.file.filename
     });
 });
 
