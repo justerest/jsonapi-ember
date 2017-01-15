@@ -1,3 +1,5 @@
+let configMySQL = require('./lib/confmysql.js');
+
 var jsonApi = require("jsonapi-server");
 var RelationalDbStore = require("jsonapi-store-relationaldb");
 var app = jsonApi.getExpressServer();
@@ -6,30 +8,25 @@ var moment = require('moment');
 var bearer = require('bearer');
 var mysql = require('mysql');
 var async = require("async");
-var connection = mysql.createConnection({
-    host: 'kscript.ru',
-    user: 'kamertonmu_just',
-    password: 'PKCXLWEQ',
-    database: 'kamertonmu_kscript'
-});
+var connection = mysql.createConnection(configMySQL.forMySQLconnect);
 var multer = require('multer');
 var fs = require('fs-extra');
 var imagemin = require('imagemin');
 var imageminPngquant = require('imagemin-pngquant');
+var imageminMozjpeg = require('imagemin-mozjpeg');
 
 var storage = multer.diskStorage({
     destination: function (req, file, cb) {
-            let dir = __dirname + '/../gorodrazvlecheniy/public/upload/' + req.params.user + '/new/' + req.params.name;
-            fs.emptyDir(dir, function () {
-                fs.mkdirs(dir, function (err) {
-                    cb(null, dir);
-                });
+        let dir = __dirname + '/../gorodrazvlecheniy/public/upload/' + req.params.user + '/new/' + req.params.name;
+        fs.emptyDir(dir, function () {
+            fs.mkdirs(dir, function (err) {
+                cb(null, dir);
             });
-        }
-        /*,
-        filename: function (req, file, cb) {
-            cb(null, file.originalname);
-        }*/
+        });
+    },
+    filename: function (req, file, cb) {
+        cb(null, moment(Date.now()) + '_' + file.originalname);
+    }
 });
 
 var upload = multer({
@@ -38,24 +35,29 @@ var upload = multer({
 
 var instances = [];
 
-let configMySQL = {
-    dialect: "mysql",
-    host: "kscript.ru",
-    port: 3306,
-    database: "kamertonmu_kscript", // If not provided, defaults to the name of the resource
-    username: "kamertonmu_just",
-    password: "PKCXLWEQ",
-    logging: false
-};
+let dbStore = new Array();
+for (let i = 1; i <= 6; i++) {
+    dbStore[i] = new RelationalDbStore(configMySQL.forJsonApi);
+    instances.push(dbStore[i]);
+}
 
-let dbStore = new RelationalDbStore(configMySQL);
-let dbStore2 = new RelationalDbStore(configMySQL);
-let dbStore3 = new RelationalDbStore(configMySQL);
-let dbStore4 = new RelationalDbStore(configMySQL);
-instances.push(dbStore);
-instances.push(dbStore2);
-instances.push(dbStore3);
-instances.push(dbStore4);
+fs.readFile('C:/Users/lubov/Desktop/_ember/gorodrazvlecheniy/app/models/company.js', 'utf8', (err, fd) => {
+    let mystr = fd;
+    let one = 'export default DS.Model.extend({';
+    mystr = mystr.slice(mystr.indexOf(one) + one.length, mystr.length - 5);
+    mystr = mystr.replace(/\r\n/g, '').replace(/\s/g, '').replace(/'/g, '"');
+    let ob = {};
+    let n = 0;
+    for (let i = 0; i < mystr.length; i++) {
+        if (mystr[i] == ',') n = i + 1;
+        if (mystr[i] == ':') {
+            let str = mystr.slice(i, i + 10);
+            let rav = str == ':DS.attr()' ? jsonApi.Joi.string() : str == ':DS.attr("number")' ? jsonApi.Joi.number() : ;
+            ob[mystr.slice(n, i)] =
+        }
+    }
+    console.log(ob);
+});
 
 jsonApi.setConfig({
     port: 80,
@@ -64,17 +66,42 @@ jsonApi.setConfig({
 });
 
 jsonApi.define({
+    resource: "notetypes",
+    handlers: dbStore[6],
+    attributes: {
+        name: jsonApi.Joi.string(),
+        children: jsonApi.Joi.belongsToMany({
+            resource: "notetypes",
+            as: "parent"
+        }),
+        parent: jsonApi.Joi.one('notetypes')
+    }
+});
+jsonApi.define({
+    resource: "gallaries",
+    handlers: dbStore[1],
+    attributes: {
+        name: jsonApi.Joi.string(),
+        images: jsonApi.Joi.belongsToMany({
+            resource: "images",
+            as: "gallary"
+        }),
+        company: jsonApi.Joi.one('companies')
+    }
+});
+jsonApi.define({
     resource: "images",
-    handlers: dbStore4,
+    handlers: dbStore[2],
     attributes: {
         path: jsonApi.Joi.string(),
         typeimage: jsonApi.Joi.string(),
-        user: jsonApi.Joi.one('users')
+        user: jsonApi.Joi.one('users'),
+        gallary: jsonApi.Joi.one('gallaries')
     }
 });
 jsonApi.define({
     resource: "notes",
-    handlers: dbStore,
+    handlers: dbStore[3],
     attributes: {
         title: jsonApi.Joi.string(),
         content: jsonApi.Joi.string(),
@@ -85,27 +112,34 @@ jsonApi.define({
 });
 jsonApi.define({
     resource: "companies",
-    handlers: dbStore2,
+    handlers: dbStore[4],
     attributes: {
         name: jsonApi.Joi.string(),
+        class: jsonApi.Joi.string(),
+        logo: jsonApi.Joi.string(),
+        thumb: jsonApi.Joi.string(),
         info: jsonApi.Joi.string(),
         address: jsonApi.Joi.string(),
         phone: jsonApi.Joi.string(),
         worktime: jsonApi.Joi.string(),
         website: jsonApi.Joi.string(),
         vk: jsonApi.Joi.string(),
-        instagram: jsonApi.Joi.string(),
+        odnoklassniki: jsonApi.Joi.string(),
         facebook: jsonApi.Joi.string(),
         owner: jsonApi.Joi.one('users'),
         notes: jsonApi.Joi.belongsToMany({
             resource: "notes",
+            as: "company"
+        }),
+        gallaries: jsonApi.Joi.belongsToMany({
+            resource: "gallaries",
             as: "company"
         })
     }
 });
 jsonApi.define({
     resource: "users",
-    handlers: dbStore3,
+    handlers: dbStore[5],
     attributes: {
         username: jsonApi.Joi.string(),
         password: jsonApi.Joi.string(),
@@ -129,7 +163,6 @@ jsonApi.define({
     }
 });
 
-//app.use(bodyParser());
 app.use(bodyParser.urlencoded({
     extended: false
 }));
@@ -289,11 +322,12 @@ app.post('/api/images/', function (req, res, next) {
     let dir = __dirname + '/../gorodrazvlecheniy/public/upload/' + user;
     imagemin([dir + '/new/**'], dir + '/files', {
         plugins: [
+        imageminMozjpeg(),
         imageminPngquant({
                 quality: '65-80'
             })
     ]
-    });
+    }).then((f) => {}, (e) => {});
     fs.emptyDir(dir + '/new');
     next();
 });
@@ -309,8 +343,8 @@ app.delete('/api/images/:id', function (req, res, next) {
     });
 });
 
-async.map(instances, function (dbStore, callback) {
-    dbStore.populate(callback);
+async.map(instances, function (dbStore /*, callback*/ ) {
+    dbStore.populate( /*callback*/ );
 }, function () {});
 
 jsonApi.start();
