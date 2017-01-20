@@ -36,28 +36,10 @@ var upload = multer({
 var instances = [];
 
 let dbStore = new Array();
-for (let i = 1; i <= 6; i++) {
+for (let i = 1; i <= 7; i++) {
     dbStore[i] = new RelationalDbStore(configMySQL.forJsonApi);
     instances.push(dbStore[i]);
 }
-
-fs.readFile('C:/Users/lubov/Desktop/_ember/gorodrazvlecheniy/app/models/company.js', 'utf8', (err, fd) => {
-    let mystr = fd;
-    let one = 'export default DS.Model.extend({';
-    mystr = mystr.slice(mystr.indexOf(one) + one.length, mystr.length - 5);
-    mystr = mystr.replace(/\r\n/g, '').replace(/\s/g, '').replace(/'/g, '"');
-    let ob = {};
-    let n = 0;
-    for (let i = 0; i < mystr.length; i++) {
-        if (mystr[i] == ',') n = i + 1;
-        if (mystr[i] == ':') {
-            let str = mystr.slice(i, i + 10);
-            let rav = str == ':DS.attr()' ? jsonApi.Joi.string() : str == ':DS.attr("number")' ? jsonApi.Joi.number() : ;
-            ob[mystr.slice(n, i)] =
-        }
-    }
-    console.log(ob);
-});
 
 jsonApi.setConfig({
     port: 80,
@@ -65,6 +47,14 @@ jsonApi.setConfig({
     base: 'api'
 });
 
+jsonApi.define({
+    resource: "balances",
+    handlers: dbStore[7],
+    attributes: {
+        money: jsonApi.Joi.number(),
+        user: jsonApi.Joi.one('users')
+    }
+});
 jsonApi.define({
     resource: "notetypes",
     handlers: dbStore[6],
@@ -74,7 +64,11 @@ jsonApi.define({
             resource: "notetypes",
             as: "parent"
         }),
-        parent: jsonApi.Joi.one('notetypes')
+        parent: jsonApi.Joi.one('notetypes'),
+        companies: jsonApi.Joi.belongsToMany({
+            resource: 'companies',
+            as: 'class'
+        })
     }
 });
 jsonApi.define({
@@ -115,17 +109,18 @@ jsonApi.define({
     handlers: dbStore[4],
     attributes: {
         name: jsonApi.Joi.string(),
-        class: jsonApi.Joi.string(),
+        class: jsonApi.Joi.one('notetypes'),
         logo: jsonApi.Joi.string(),
         thumb: jsonApi.Joi.string(),
         info: jsonApi.Joi.string(),
         address: jsonApi.Joi.string(),
         phone: jsonApi.Joi.string(),
         worktime: jsonApi.Joi.string(),
-        website: jsonApi.Joi.string(),
-        vk: jsonApi.Joi.string(),
-        odnoklassniki: jsonApi.Joi.string(),
-        facebook: jsonApi.Joi.string(),
+        website: jsonApi.Joi.string().uri(),
+        vk: jsonApi.Joi.string().uri(),
+        odnoklassniki: jsonApi.Joi.string().uri(),
+        facebook: jsonApi.Joi.string().uri(),
+        instagram: jsonApi.Joi.string().uri(),
         owner: jsonApi.Joi.one('users'),
         notes: jsonApi.Joi.belongsToMany({
             resource: "notes",
@@ -134,12 +129,26 @@ jsonApi.define({
         gallaries: jsonApi.Joi.belongsToMany({
             resource: "gallaries",
             as: "company"
-        })
+        }),
+        enabled: jsonApi.Joi.number()
     }
 });
+
+let chainHandler = new jsonApi.ChainHandler();
+chainHandler.afterSearch = function (request, results, pagination, callback) {
+    for (let i = 0; i < results.length; i++) {
+        delete results[i].password;
+    }
+    return callback(null, results, pagination);
+};
+chainHandler.afterFind = (request, results, callback) => {
+    delete results.password;
+    return callback(null, results);
+}
+
 jsonApi.define({
     resource: "users",
-    handlers: dbStore[5],
+    handlers: chainHandler.chain(dbStore[5]),
     attributes: {
         username: jsonApi.Joi.string(),
         password: jsonApi.Joi.string(),
@@ -147,7 +156,6 @@ jsonApi.define({
         roles: jsonApi.Joi.string(),
         phone: jsonApi.Joi.string(),
         email: jsonApi.Joi.string().email(),
-        money: jsonApi.Joi.number(),
         companies: jsonApi.Joi.belongsToMany({
             resource: "companies",
             as: "owner"
@@ -159,9 +167,20 @@ jsonApi.define({
         images: jsonApi.Joi.belongsToMany({
             resource: "images",
             as: "user"
-        })
+        }),
+        balance: jsonApi.Joi.one('balances')
     }
 });
+
+let shemy = jsonApi._resources;
+for (let key in shemy) {
+    for (let key2 in shemy[key]['attributes']) {
+        shemy[key]['attributes'][key2] = shemy[key]['attributes'][key2].allow(null);
+    }
+    for (let key2 in shemy[key]['onCreate']) {
+        shemy[key]['onCreate'][key2] = shemy[key]['onCreate'][key2].allow(null);
+    }
+}
 
 app.use(bodyParser.urlencoded({
     extended: false
@@ -191,12 +210,11 @@ bearer({
     //Make sure to pass in the app (express) object so we can set routes
     app: app,
     //Please change server key for your own safety!
-    serverKey: "bv7oY7on$HM_0*&RG2PSCDKJCAJ83jdf",
+    serverKey: configMySQL.bearer,
     tokenUrl: '/api/oauth2', //Call this URL to get your token. Accepts only POST method
     extendTokenUrl: '/api/extendtoken', //Call this URL to get your token. Accepts only POST method
     cookieName: 'x-auth', //default name for getting token from cookie when not found in Authorization header
     createToken: function (req, next, cancel) {
-
         //If your user is not valid just return "underfined" from this method.
         //Your token will be added to req object and you can use it from any method later
         var username = req.body.username;
@@ -205,7 +223,6 @@ bearer({
         connection.query('SELECT * FROM `users` WHERE `username` LIKE "' + username + '"', function (err, rows) {
             if (!err && rows[0]) {
                 if (rows[0].password == password) {
-
                     next({
                         expire: moment(Date.now()).add(1, 'months').format('YYYY-MM-DD HH:mm:ss'),
                         username: username,
@@ -223,7 +240,6 @@ bearer({
                     });
                 }
             } else {
-
                 cancel({
                     code: 1000,
                     message: 'I do not like you'
@@ -291,24 +307,19 @@ bearer({
     },
     secureRoutes: [{
             url: '/api/users/*',
-            method: 'get',
-            //roles: 'admin'
-      }
-    ]
+            method: 'all'
+      },
+        {
+            url: '/api/users/',
+            roles: 'admin',
+            method: 'get'
+ }]
 });
 
 
 
 //==============================================================================
 //Routing
-app.get('/api/:table/auth', function (req, res, next) {
-    let id = req.authToken['custom_id'];
-    if (!id) return res.status(402).send('No ID');
-    req.path = '/api/users/' + id;
-    req.href = '/api/users/' + id;
-    req.url = '/api/users/' + id;
-    next();
-});
 
 app.post('/upload/:user/:name', upload.single('file'), function (req, res) {
     res.send({
@@ -327,9 +338,12 @@ app.post('/api/images/', function (req, res, next) {
                 quality: '65-80'
             })
     ]
-    }).then((f) => {}, (e) => {});
+    }).then((f) => {
+        next();
+    }, (e) => {
+        next();
+    });
     fs.emptyDir(dir + '/new');
-    next();
 });
 
 app.delete('/api/images/:id', function (req, res, next) {
