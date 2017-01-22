@@ -130,7 +130,8 @@ jsonApi.define({
             resource: "gallaries",
             as: "company"
         }),
-        enabled: jsonApi.Joi.number()
+        enabled: jsonApi.Joi.number(),
+        expiredate: jsonApi.Joi.number()
     }
 });
 
@@ -356,9 +357,14 @@ app.delete('/api/images/:id', function (req, res, next) {
         }
     });
 });
+app.get('/current/time/', function (req, res) {
+    res.send(moment(new Date).format('YYYYMMDDHH'));
+});
 
 async.map(instances, function (dbStore /*, callback*/ ) {
     dbStore.populate( /*callback*/ );
 }, function () {});
+
+console.log('JSONAPI start...');
 
 jsonApi.start();
