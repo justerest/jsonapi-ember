@@ -1,0 +1,16 @@
+Allow from all
+
+RewriteEngine on
+
+SetEnv GHOST_NODE_VERSION_CHECK false
+PassengerStartupFile app.js
+PassengerResolveSymlinksInDocumentRoot on
+Require all granted
+PassengerAppType node
+PassengerAppRoot /home/kamertonmu/domains/api.kscript.ru/public_html/
+Options -MultiViews
+
+<FilesMatch ".(htaccess|js)$">
+ Order Allow,Deny
+ Deny from all
+ </FilesMatch>

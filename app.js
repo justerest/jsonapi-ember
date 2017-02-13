@@ -1,42 +1,40 @@
-let configMySQL = require('./lib/confmysql.js');
-
-var jsonApi = require("jsonapi-server");
-var RelationalDbStore = require("jsonapi-store-relationaldb");
-var app = jsonApi.getExpressServer();
-var bodyParser = require('body-parser');
-var moment = require('moment');
-var bearer = require('bearer');
-var mysql = require('mysql');
-var async = require("async");
-var connection = mysql.createConnection(configMySQL.forMySQLconnect);
-var multer = require('multer');
-var fs = require('fs-extra');
-var imagemin = require('imagemin');
-var imageminPngquant = require('imagemin-pngquant');
-var imageminMozjpeg = require('imagemin-mozjpeg');
-
-var storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        let dir = __dirname + '/../gorodrazvlecheniy/public/upload/' + req.params.user + '/new/' + req.params.name;
-        fs.emptyDir(dir, function () {
-            fs.mkdirs(dir, function (err) {
-                cb(null, dir);
+let configMySQL = require('./lib/confmysql.js'),
+    jsonApi = require("jsonapi-server"),
+    RelationalDbStore = require("jsonapi-store-relationaldb"),
+    app = jsonApi.getExpressServer(),
+    bodyParser = require('body-parser'),
+    moment = require('moment'),
+    bearer = require('bearer'),
+    mysql = require('mysql'),
+    aSync = require("async"),
+    connection = mysql.createConnection(configMySQL.forMySQLconnect),
+    multer = require('multer'),
+    fs = require('fs-extra'),
+    imagemin = require('imagemin'),
+    imageminWebp = require('imagemin-webp'),
+    storage = multer.diskStorage({
+        destination: function (req, file, cb) {
+            let dir = __dirname + '/../../kscript.ru/public_html/upload/' + req.params.user + '/new/' + req.params.name;
+            fs.emptyDir(dir, function () {
+                fs.mkdirs(dir, function (err) {
+                    cb(null, dir);
+                });
             });
-        });
-    },
-    filename: function (req, file, cb) {
-        cb(null, moment(Date.now()) + '_' + file.originalname);
-    }
-});
+        },
+        filename: function (req, file, cb) {
+            cb(null, moment(Date.now()) + '_' + file.originalname + '.png');
+        }
+    }),
+    upload = multer({
+        storage: storage
+    }),
+    instances = [],
+    dbStore = new Array(),
+    nodemailer = require('nodemailer'),
+    transporter = nodemailer.createTransport(configMySQL.yandex),
+    compression = require('compression');
 
-var upload = multer({
-    storage: storage
-});
-
-var instances = [];
-
-let dbStore = new Array();
-for (let i = 1; i <= 7; i++) {
+for (let i = 1; i <= 9; i++) {
     dbStore[i] = new RelationalDbStore(configMySQL.forJsonApi);
     instances.push(dbStore[i]);
 }
@@ -47,6 +45,40 @@ jsonApi.setConfig({
     base: 'api'
 });
 
+jsonApi.define({
+    resource: "events",
+    handlers: dbStore[9],
+    attributes: {
+        name: jsonApi.Joi.string(),
+        title: jsonApi.Joi.string(),
+        info: jsonApi.Joi.string(),
+        time: jsonApi.Joi.number(),
+        cost: jsonApi.Joi.string(),
+        pay: jsonApi.Joi.string(),
+        address: jsonApi.Joi.string(),
+        phone: jsonApi.Joi.string(),
+        website: jsonApi.Joi.string(),
+        expiredate: jsonApi.Joi.number(),
+        enabled: jsonApi.Joi.number(),
+        company: jsonApi.Joi.one('companies'),
+        user: jsonApi.Joi.one('users'),
+        firstimage: jsonApi.Joi.string(),
+        secondimage: jsonApi.Joi.string()
+    }
+});
+jsonApi.define({
+    resource: "options",
+    handlers: dbStore[8],
+    attributes: {
+        name: jsonApi.Joi.string(),
+        text: jsonApi.Joi.string(),
+        children: jsonApi.Joi.belongsToMany({
+            resource: "options",
+            as: "parent"
+        }),
+        parent: jsonApi.Joi.one('options')
+    }
+});
 jsonApi.define({
     resource: "balances",
     handlers: dbStore[7],
@@ -60,6 +92,7 @@ jsonApi.define({
     handlers: dbStore[6],
     attributes: {
         name: jsonApi.Joi.string(),
+        category: jsonApi.Joi.string(),
         children: jsonApi.Joi.belongsToMany({
             resource: "notetypes",
             as: "parent"
@@ -80,7 +113,8 @@ jsonApi.define({
             resource: "images",
             as: "gallary"
         }),
-        company: jsonApi.Joi.one('companies')
+        company: jsonApi.Joi.one('companies'),
+        max: jsonApi.Joi.number()
     }
 });
 jsonApi.define({
@@ -113,14 +147,16 @@ jsonApi.define({
         logo: jsonApi.Joi.string(),
         thumb: jsonApi.Joi.string(),
         info: jsonApi.Joi.string(),
+        about: jsonApi.Joi.string(),
         address: jsonApi.Joi.string(),
         phone: jsonApi.Joi.string(),
         worktime: jsonApi.Joi.string(),
-        website: jsonApi.Joi.string().uri(),
-        vk: jsonApi.Joi.string().uri(),
-        odnoklassniki: jsonApi.Joi.string().uri(),
-        facebook: jsonApi.Joi.string().uri(),
-        instagram: jsonApi.Joi.string().uri(),
+        website: jsonApi.Joi.string(),
+        vk: jsonApi.Joi.string(),
+        odnoklassniki: jsonApi.Joi.string(),
+        facebook: jsonApi.Joi.string(),
+        instagram: jsonApi.Joi.string(),
+        youtube: jsonApi.Joi.string(),
         owner: jsonApi.Joi.one('users'),
         notes: jsonApi.Joi.belongsToMany({
             resource: "notes",
@@ -130,8 +166,13 @@ jsonApi.define({
             resource: "gallaries",
             as: "company"
         }),
+        events: jsonApi.Joi.belongsToMany({
+            resource: "events",
+            as: "company"
+        }),
         enabled: jsonApi.Joi.number(),
-        expiredate: jsonApi.Joi.number()
+        expiredate: jsonApi.Joi.number(),
+        lefttext: jsonApi.Joi.string()
     }
 });
 
@@ -156,7 +197,7 @@ jsonApi.define({
         fullname: jsonApi.Joi.string(),
         roles: jsonApi.Joi.string(),
         phone: jsonApi.Joi.string(),
-        email: jsonApi.Joi.string().email(),
+        email: jsonApi.Joi.string(),
         companies: jsonApi.Joi.belongsToMany({
             resource: "companies",
             as: "owner"
@@ -167,6 +208,10 @@ jsonApi.define({
         }),
         images: jsonApi.Joi.belongsToMany({
             resource: "images",
+            as: "user"
+        }),
+        events: jsonApi.Joi.belongsToMany({
+            resource: "events",
             as: "user"
         }),
         balance: jsonApi.Joi.one('balances')
@@ -189,23 +234,20 @@ app.use(bodyParser.urlencoded({
 
 // Add headers
 app.use(function (req, res, next) {
-
     // Website you wish to allow to connect
     res.setHeader('Access-Control-Allow-Origin', '*');
-
     // Request methods you wish to allow
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
-
     // Request headers you wish to allow
     res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type,Authorization');
-
     // Set to true if you need the website to include cookies in the requests sent
     // to the API (e.g. in case you use sessions)
     res.setHeader('Access-Control-Allow-Credentials', true);
-
     // Pass to next layer of middleware
     next();
 });
+
+app.use(compression());
 
 bearer({
     //Make sure to pass in the app (express) object so we can set routes
@@ -306,65 +348,67 @@ bearer({
             error: errorMessage
         });
     },
-    secureRoutes: [{
-            url: '/api/users/*',
-            method: 'all'
-      },
-        {
-            url: '/api/users/',
-            roles: 'admin',
-            method: 'get'
- }]
+    secureRoutes: []
 });
-
-
 
 //==============================================================================
 //Routing
 
 app.post('/upload/:user/:name', upload.single('file'), function (req, res) {
     res.send({
-        dest: req.file.destination,
         imgName: req.file.filename
     });
 });
 
-app.post('/api/images/', function (req, res, next) {
-    let user = req.authToken.username;
-    let dir = __dirname + '/../gorodrazvlecheniy/public/upload/' + user;
-    imagemin([dir + '/new/**'], dir + '/files', {
-        plugins: [
-        imageminMozjpeg(),
-        imageminPngquant({
-                quality: '65-80'
-            })
-    ]
-    }).then((f) => {
-        next();
+app.post('/check/upload/', function (req, res) {
+    let user = req.body.username;
+    let dir = __dirname + '/../../kscript.ru/public_html/upload/' + user;
+    imagemin([dir + '/new/**'], dir + '/files').then((f) => {
+        res.send("OK");
+        fs.emptyDir(dir + '/new');
     }, (e) => {
-        next();
+        res.status(513).send(e);
+        fs.emptyDir(dir + '/new');
     });
-    fs.emptyDir(dir + '/new');
 });
 
 app.delete('/api/images/:id', function (req, res, next) {
-    let dir = __dirname + '/../gorodrazvlecheniy/public';
+    let dir = __dirname + '/../../kscript.ru/public_html';
     connection.query('SELECT * FROM `images` WHERE `id` LIKE "' + req.params.id + '"', function (err, rows) {
-        if (!err && rows) {
-            dir += rows[0].path;
+        let dirRem = rows[0].path;
+        if (!err && rows && dirRem) {
+            dir += dirRem.replace(/http:\/\/kscript.ru/, '');
             fs.remove(dir);
             next();
         }
     });
 });
+
 app.get('/current/time/', function (req, res) {
     res.send(moment(new Date).format('YYYYMMDDHH'));
 });
 
-async.map(instances, function (dbStore /*, callback*/ ) {
-    dbStore.populate( /*callback*/ );
-}, function () {});
+app.post('/mail/send/', (req, res) => {
+    let mailOptions = {
+        from: '"Fred Foo 👻" <justerest@yandex.ru>', // sender address
+        to: 's.klevakin@mail.ru', // list of receivers
+        subject: 'Hello ✔', // Subject line
+        text: 'Hello world ?', // plain text body
+        html: '<b>Hello world ?</b>' // html body
+    };
 
-console.log('JSONAPI start...');
+    // send mail with defined transport object
+    transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+            return res.send(error);
+        }
+        res.send(info);
+        //console.log('Message %s sent: %s', info.messageId, info.response);
+    });
+});
+
+aSync.map(instances, function (dbStore /*, callback*/ ) {
+    dbStore.populate( /*callback*/ );
+} /*, function () {}*/ );
 
 jsonApi.start();
