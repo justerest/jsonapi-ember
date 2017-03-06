@@ -2,7 +2,6 @@ const configMySQL = require('./lib/confmysql.js'),
     jsonApi = require("jsonapi-server"),
     app = jsonApi.getExpressServer(),
     appSettings = require('./lib/app-settings.js'),
-    moment = require('moment'),
     bearerSettings = require('./lib/bearer-settings.js'),
     routing = require('./lib/routing.js');
 
