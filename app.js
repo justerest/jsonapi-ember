@@ -6,12 +6,12 @@ let configMySQL = require('./lib/confmysql.js'),
     moment = require('moment'),
     bearer = require('bearer'),
     mysql = require('mysql'),
-    aSync = require("async"),
+    //aSync = require("async"),
     connection = mysql.createConnection(configMySQL.forMySQLconnect),
     multer = require('multer'),
     fs = require('fs-extra'),
-    imagemin = require('imagemin'),
-    imageminWebp = require('imagemin-webp'),
+    //imagemin = require('imagemin'),
+    //imageminWebp = require('imagemin-webp'),
     storage = multer.diskStorage({
         destination: function (req, file, cb) {
             let dir = __dirname + '/../../kscript.ru/public_html/upload/' + req.params.user + '/new/' + req.params.name;
@@ -29,25 +29,28 @@ let configMySQL = require('./lib/confmysql.js'),
         storage: storage
     }),
     instances = [],
-    dbStore = new Array(),
     nodemailer = require('nodemailer'),
-    transporter = nodemailer.createTransport(configMySQL.yandex),
+    transporter = nodemailer.createTransport(configMySQL.mail),
     compression = require('compression');
 
-for (let i = 1; i <= 9; i++) {
-    dbStore[i] = new RelationalDbStore(configMySQL.forJsonApi);
-    instances.push(dbStore[i]);
-}
-
 jsonApi.setConfig({
-    port: 80,
+    port: 443,
     graphiql: false,
     base: 'api'
 });
 
 jsonApi.define({
+    resource: "bonuscards",
+    handlers: new RelationalDbStore(configMySQL.forJsonApi),
+    attributes: {
+        company: jsonApi.Joi.one('companies'),
+        text: jsonApi.Joi.string(),
+        image: jsonApi.Joi.string()
+    }
+});
+jsonApi.define({
     resource: "events",
-    handlers: dbStore[9],
+    handlers: new RelationalDbStore(configMySQL.forJsonApi),
     attributes: {
         name: jsonApi.Joi.string(),
         title: jsonApi.Joi.string(),
@@ -68,7 +71,7 @@ jsonApi.define({
 });
 jsonApi.define({
     resource: "options",
-    handlers: dbStore[8],
+    handlers: new RelationalDbStore(configMySQL.forJsonApi),
     attributes: {
         name: jsonApi.Joi.string(),
         text: jsonApi.Joi.string(),
@@ -81,7 +84,7 @@ jsonApi.define({
 });
 jsonApi.define({
     resource: "balances",
-    handlers: dbStore[7],
+    handlers: new RelationalDbStore(configMySQL.forJsonApi),
     attributes: {
         money: jsonApi.Joi.number(),
         user: jsonApi.Joi.one('users')
@@ -89,7 +92,7 @@ jsonApi.define({
 });
 jsonApi.define({
     resource: "notetypes",
-    handlers: dbStore[6],
+    handlers: new RelationalDbStore(configMySQL.forJsonApi),
     attributes: {
         name: jsonApi.Joi.string(),
         category: jsonApi.Joi.string(),
@@ -106,7 +109,7 @@ jsonApi.define({
 });
 jsonApi.define({
     resource: "gallaries",
-    handlers: dbStore[1],
+    handlers: new RelationalDbStore(configMySQL.forJsonApi),
     attributes: {
         name: jsonApi.Joi.string(),
         images: jsonApi.Joi.belongsToMany({
@@ -119,7 +122,7 @@ jsonApi.define({
 });
 jsonApi.define({
     resource: "images",
-    handlers: dbStore[2],
+    handlers: new RelationalDbStore(configMySQL.forJsonApi),
     attributes: {
         path: jsonApi.Joi.string(),
         typeimage: jsonApi.Joi.string(),
@@ -128,19 +131,8 @@ jsonApi.define({
     }
 });
 jsonApi.define({
-    resource: "notes",
-    handlers: dbStore[3],
-    attributes: {
-        title: jsonApi.Joi.string(),
-        content: jsonApi.Joi.string(),
-        typenote: jsonApi.Joi.string(),
-        author: jsonApi.Joi.one('users'),
-        company: jsonApi.Joi.one('companies')
-    }
-});
-jsonApi.define({
     resource: "companies",
-    handlers: dbStore[4],
+    handlers: new RelationalDbStore(configMySQL.forJsonApi),
     attributes: {
         name: jsonApi.Joi.string(),
         class: jsonApi.Joi.one('notetypes'),
@@ -158,10 +150,6 @@ jsonApi.define({
         instagram: jsonApi.Joi.string(),
         youtube: jsonApi.Joi.string(),
         owner: jsonApi.Joi.one('users'),
-        notes: jsonApi.Joi.belongsToMany({
-            resource: "notes",
-            as: "company"
-        }),
         gallaries: jsonApi.Joi.belongsToMany({
             resource: "gallaries",
             as: "company"
@@ -172,7 +160,8 @@ jsonApi.define({
         }),
         enabled: jsonApi.Joi.number(),
         expiredate: jsonApi.Joi.number(),
-        lefttext: jsonApi.Joi.string()
+        lefttext: jsonApi.Joi.string(),
+        bonuscard: jsonApi.Joi.one('bonuscards')
     }
 });
 
@@ -190,7 +179,7 @@ chainHandler.afterFind = (request, results, callback) => {
 
 jsonApi.define({
     resource: "users",
-    handlers: chainHandler.chain(dbStore[5]),
+    handlers: chainHandler.chain(new RelationalDbStore(configMySQL.forJsonApi)),
     attributes: {
         username: jsonApi.Joi.string(),
         password: jsonApi.Joi.string(),
@@ -201,10 +190,6 @@ jsonApi.define({
         companies: jsonApi.Joi.belongsToMany({
             resource: "companies",
             as: "owner"
-        }),
-        notes: jsonApi.Joi.belongsToMany({
-            resource: "notes",
-            as: "author"
         }),
         images: jsonApi.Joi.belongsToMany({
             resource: "images",
@@ -377,7 +362,7 @@ app.delete('/api/images/:id', function (req, res, next) {
     connection.query('SELECT * FROM `images` WHERE `id` LIKE "' + req.params.id + '"', function (err, rows) {
         let dirRem = rows[0].path;
         if (!err && rows && dirRem) {
-            dir += dirRem.replace(/http:\/\/kscript.ru/, '');
+            dir += dirRem.replace(/https:\/\/kscript.ru/, '');
             fs.remove(dir);
             next();
         }
@@ -389,14 +374,13 @@ app.get('/current/time/', function (req, res) {
 });
 
 app.post('/mail/send/', (req, res) => {
-    let mailOptions = {
-        from: '"Fred Foo 👻" <justerest@yandex.ru>', // sender address
-        to: 's.klevakin@mail.ru', // list of receivers
-        subject: 'Hello ✔', // Subject line
-        text: 'Hello world ?', // plain text body
-        html: '<b>Hello world ?</b>' // html body
+    const mailOptions = {
+        from: '"Город Развлечений" <gorodinfo67@mail.ru>', // sender address
+        to: req.body.to, // list of receivers
+        subject: req.body.subject, // Subject line
+        text: req.body.text, // plain text body
+        html: req.body.html + '<br><br>Спасибо за то, что Вы с нами!<br><br>Город Развлечений, Смоленск.' // html body
     };
-
     // send mail with defined transport object
     transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
@@ -406,9 +390,5 @@ app.post('/mail/send/', (req, res) => {
         //console.log('Message %s sent: %s', info.messageId, info.response);
     });
 });
-
-aSync.map(instances, function (dbStore /*, callback*/ ) {
-    dbStore.populate( /*callback*/ );
-} /*, function () {}*/ );
 
 jsonApi.start();
