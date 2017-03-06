@@ -1,23 +1,23 @@
 {
-  "name": "jsonapi-ember",
-  "version": "1.0.0",
-  "description": "",
-  "main": "app.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node app.js"
-  },
-  "author": "Klevakin Sergey",
-  "license": "ISC",
-  "devDependencies": {},
-  "dependencies": {
-    "bearer": "0.0.20",
-    "compression": "^1.6.2",
-    "fs-extra": "^1.0.0",
-    "jsonapi-server": "^2.3.0",
-    "jsonapi-store-relationaldb": "^1.2.8",
-    "multer": "^1.2.1",
-    "mysql": "^2.12.0",
-    "nodemailer": "^3.0.2"
-  }
+    "name": "jsonapi-ember",
+    "version": "1.0.0",
+    "description": "",
+    "main": "app.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "node app.js"
+    },
+    "author": "Klevakin Sergey",
+    "license": "ISC",
+    "devDependencies": {},
+    "dependencies": {
+        "bearer": "0.0.20",
+        "compression": "^1.6.2",
+        "fs-extra": "^1.0.0",
+        "jsonapi-server": "^2.3.0",
+        "jsonapi-store-relationaldb": "^1.2.8",
+        "multer": "^1.2.1",
+        "mysql": "^2.12.0",
+        "nodemailer": "^3.0.2"
+    }
 }
