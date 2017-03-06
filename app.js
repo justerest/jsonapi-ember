@@ -8,7 +8,7 @@ const jsonApi = require("jsonapi-server"),
 require('./lib/resources.js');
 
 jsonApi.setConfig({
-    port: 80,
+    port: 443,
     graphiql: false,
     base: 'api'
 });
