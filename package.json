@@ -14,8 +14,6 @@
     "bearer": "0.0.20",
     "compression": "^1.6.2",
     "fs-extra": "^1.0.0",
-    "imagemin": "^5.2.2",
-    "imagemin-webp": "^4.0.0",
     "jsonapi-server": "^2.3.0",
     "jsonapi-store-relationaldb": "^1.2.8",
     "multer": "^1.2.1",
