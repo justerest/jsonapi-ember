@@ -1,7 +1,6 @@
-Allow from all
-
 RewriteEngine on
-
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301,NE]
 SetEnv GHOST_NODE_VERSION_CHECK false
 PassengerStartupFile app.js
 PassengerResolveSymlinksInDocumentRoot on
@@ -9,8 +8,3 @@ Require all granted
 PassengerAppType node
 PassengerAppRoot /home/kamertonmu/domains/api.kscript.ru/public_html/
 Options -MultiViews
-
-<FilesMatch ".(htaccess|js)$">
- Order Allow,Deny
- Deny from all
- </FilesMatch>
