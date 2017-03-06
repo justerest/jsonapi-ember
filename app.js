@@ -4,7 +4,8 @@ const jsonApi = require("jsonapi-server"),
     bearerSettings = require('./lib/bearer-settings.js'),
     routing = require('./lib/routing.js');
 
-require('./lib/resourses.js');
+//define models
+require('./lib/resources.js');
 
 jsonApi.setConfig({
     port: 80,
