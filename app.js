@@ -1,5 +1,4 @@
-const configMySQL = require('./lib/confmysql.js'),
-    jsonApi = require("jsonapi-server"),
+const jsonApi = require("jsonapi-server"),
     app = jsonApi.getExpressServer(),
     appSettings = require('./lib/app-settings.js'),
     bearerSettings = require('./lib/bearer-settings.js'),
